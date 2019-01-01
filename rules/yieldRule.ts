@@ -1,6 +1,12 @@
 import * as ts from "typescript";
 import * as Lint from "tslint";
 
+const CHECK_RETURN_TYPE = "check-return-type";
+
+type Options = {
+    checkReturnType: boolean;
+};
+
 export class Rule extends Lint.Rules.TypedRule {
     public static FAILURE_STRING = "yield result should be typed if result is used: (__EXPRESSION__) as 'ResultType'";
     public static PARENT_TYPES_SHOULD_ANALYSED = [
@@ -12,15 +18,15 @@ export class Rule extends Lint.Rules.TypedRule {
     public applyWithProgram(sourceFile: ts.SourceFile, program: ts.Program): Lint.RuleFailure[] {
         const checker = program.getTypeChecker();
 
-        // We convert the `ruleArguments` into a useful format before passing it to the constructor of AbstractWalker.
-        return this.applyWithWalker(new StrictYieldTypeWalker(checker, sourceFile, this.ruleName, new Set(this.ruleArguments.map(String))));
+        const options = { checkReturnType: this.ruleArguments.indexOf(CHECK_RETURN_TYPE) !== -1 };
+        return this.applyWithWalker(new StrictYieldTypeWalker(checker, sourceFile, this.ruleName, options));
     }
 }
 
-class StrictYieldTypeWalker extends Lint.AbstractWalker<Set<string>> {
+class StrictYieldTypeWalker extends Lint.AbstractWalker<Options> {
     private readonly checker: ts.TypeChecker;
 
-    constructor(checker: ts.TypeChecker, sourceFile: ts.SourceFile, ruleName: string, options: Set<string>) {
+    constructor(checker: ts.TypeChecker, sourceFile: ts.SourceFile, ruleName: string, options: Options) {
         super(sourceFile, ruleName, options);
         
         this.checker = checker;
@@ -71,7 +77,7 @@ class StrictYieldTypeWalker extends Lint.AbstractWalker<Set<string>> {
             children[1].kind === ts.SyntaxKind.AsKeyword && // should be 'as' between 
             children[2].kind !== ts.SyntaxKind.AnyKeyword; // Any is not allowed
 
-        if(result) {
+        if(result && this.options.checkReturnType) {
             const castType = this.checker.getTypeAtLocation(children[2]);
             let yieldType = yieldExpression.getChildCount() > 0 && this.checker.getTypeAtLocation(yieldExpression.getChildAt(1));
             let yieldPromiseType = this.checker['getPromisedTypeOfPromise'](yieldType);

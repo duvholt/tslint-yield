@@ -1,6 +1,7 @@
 import {helper} from './lintRunner';
 
 const rule = 'yield';
+const ruleWithReturnType = { name: "yield", options: ["check-return-type"] };
 const getFileName = (name) => 'rules/test-data/' + name + '.ts';
 const baseCode = `
 function getData() {
@@ -131,13 +132,13 @@ describe('yield Rule', () => {
          });
      });
 
-    describe('Type Checking', () => {
+    describe('Type Checking with check-return-type', () => {
         it(`should fail when having different types`, () => {
             const src = baseCode + `
             function* Test() {
                 result.data = (yield getData()) as number;
             }`;
-            const result = helper({src, rule});
+            const result = helper({ src, rule: ruleWithReturnType});
             expect(result.errorCount).toBe(1);
         });
 
@@ -146,7 +147,7 @@ describe('yield Rule', () => {
             function* Test() {
                 result.data = (yield getData()) as ResultData;
             }`;
-            const result = helper({src, rule});
+            const result = helper({ src, rule: ruleWithReturnType});
             expect(result.errorCount).toBe(0);
         });
 
@@ -155,8 +156,29 @@ describe('yield Rule', () => {
             function* Test() {
                 result.data = (yield number) as number;
             }`;
-            const result = helper({src, rule});
+            const result = helper({ src, rule: ruleWithReturnType});
             expect(result.errorCount).toBe(1);
+        });
+    });
+
+
+    describe('Type Checking without check-return-type', () => {
+        it(`shouldn't fail when having different types`, () => {
+            const src = baseCode + `
+            function* Test() {
+                result.data = (yield getData()) as number;
+            }`;
+            const result = helper({ src, rule });
+            expect(result.errorCount).toBe(0);
+        });
+
+        it(`should fail when having wrong yield type`, () => {
+            const src = baseCode + `
+            function* Test() {
+                result.data = (yield number) as number;
+            }`;
+            const result = helper({ src, rule });
+            expect(result.errorCount).toBe(0);
         });
     });
 });
