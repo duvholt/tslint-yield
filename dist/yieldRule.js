@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var ts = require("typescript");
 var Lint = require("tslint");
+var CHECK_RETURN_TYPE = "check-return-type";
 var Rule = (function (_super) {
     __extends(Rule, _super);
     function Rule() {
@@ -9,7 +10,8 @@ var Rule = (function (_super) {
     }
     Rule.prototype.applyWithProgram = function (sourceFile, program) {
         var checker = program.getTypeChecker();
-        return this.applyWithWalker(new StrictYieldTypeWalker(checker, sourceFile, this.ruleName, new Set(this.ruleArguments.map(String))));
+        var options = { checkReturnType: this.ruleArguments.indexOf(CHECK_RETURN_TYPE) !== -1 };
+        return this.applyWithWalker(new StrictYieldTypeWalker(checker, sourceFile, this.ruleName, options));
     };
     Rule.FAILURE_STRING = "yield result should be typed if result is used: (__EXPRESSION__) as 'ResultType'";
     Rule.PARENT_TYPES_SHOULD_ANALYSED = [
@@ -60,15 +62,14 @@ var StrictYieldTypeWalker = (function (_super) {
             children[0].kind === ts.SyntaxKind.ParenthesizedExpression &&
             children[1].kind === ts.SyntaxKind.AsKeyword &&
             children[2].kind !== ts.SyntaxKind.AnyKeyword;
-        if (result) {
+        if (result && this.options.checkReturnType) {
             var castType = this.checker.getTypeAtLocation(children[2]);
             var yieldType = yieldExpression.getChildCount() > 0 && this.checker.getTypeAtLocation(yieldExpression.getChildAt(1));
-            yieldType = this.checker['getPromisedTypeOfPromise'](yieldType) || yieldType;
-            if (yieldType !== castType) {
-                var error = "yield return type '" + this.checker.typeToString(yieldType) + "' is not equal to " +
-                    "casting type '" + this.checker.typeToString(castType) + "'";
+            var yieldPromiseType = this.checker['getPromisedTypeOfPromise'](yieldType);
+            if (yieldPromiseType !== castType) {
+                var error = !!yieldPromiseType ? "yield return type '" + this.checker.typeToString(yieldPromiseType) + "' is not equal to " +
+                    "casting type '" + this.checker.typeToString(castType) + "'" : "Yield expression does't return Promise type: " + yieldExpression.getText();
                 this.addFailureAtNode(node, error);
-                console.error(error);
             }
         }
         return result;
